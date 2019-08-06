@@ -258,8 +258,7 @@ ENV AIRFLOW_SOURCES=${AIRFLOW_SOURCES}
 
 RUN mkdir -pv ${AIRFLOW_HOME} \
     mkdir -pv ${AIRFLOW_HOME}/dags \
-    mkdir -pv ${AIRFLOW_HOME}/logs \
-    && chown -R ${AIRFLOW_USER}.${AIRFLOW_USER} ${AIRFLOW_HOME}
+    mkdir -pv ${AIRFLOW_HOME}/logs
 
 # Increase the value here to force reinstalling Apache Airflow pip dependencies
 ARG PIP_DEPENDENCIES_EPOCH_NUMBER="1"
@@ -325,20 +324,20 @@ RUN \
 # Airflow sources change frequently but dependency configuration won't change that often
 # We copy setup.py and other files needed to perform setup of dependencies
 # So in case setup.py changes we can install latest dependencies required.
-COPY --chown=airflow:airflow setup.py ${AIRFLOW_SOURCES}/setup.py
-COPY --chown=airflow:airflow setup.cfg ${AIRFLOW_SOURCES}/setup.cfg
+COPY setup.py ${AIRFLOW_SOURCES}/setup.py
+COPY setup.cfg ${AIRFLOW_SOURCES}/setup.cfg
 
-COPY --chown=airflow:airflow airflow/version.py ${AIRFLOW_SOURCES}/airflow/version.py
-COPY --chown=airflow:airflow airflow/__init__.py ${AIRFLOW_SOURCES}/airflow/__init__.py
-COPY --chown=airflow:airflow airflow/bin/airflow ${AIRFLOW_SOURCES}/airflow/bin/airflow
+COPY airflow/version.py ${AIRFLOW_SOURCES}/airflow/version.py
+COPY airflow/__init__.py ${AIRFLOW_SOURCES}/airflow/__init__.py
+COPY airflow/bin/airflow ${AIRFLOW_SOURCES}/airflow/bin/airflow
 
 # The goal of this line is to install the dependencies from the most current setup.py from sources
 # This will be usually incremental small set of packages in CI optimized build, so it will be very fast
 # In non-CI optimized build this will install all dependencies before installing sources.
 RUN pip install --no-use-pep517 -e ".[${AIRFLOW_EXTRAS}]"
 
-COPY --chown=airflow:airflow airflow/www_rbac/package.json ${AIRFLOW_SOURCES}/airflow/www_rbac/package.json
-COPY --chown=airflow:airflow airflow/www_rbac/package-lock.json ${AIRFLOW_SOURCES}/airflow/www_rbac/package-lock.json
+COPY airflow/www_rbac/package.json ${AIRFLOW_SOURCES}/airflow/www_rbac/package.json
+COPY airflow/www_rbac/package-lock.json ${AIRFLOW_SOURCES}/airflow/www_rbac/package-lock.json
 
 WORKDIR ${AIRFLOW_SOURCES}/airflow/www_rbac
 
@@ -348,15 +347,15 @@ ENV BUILD_NPM=${BUILD_NPM}
 # Install necessary NPM dependencies (triggered by changes in package-lock.json)
 RUN \
     if [[ "${BUILD_NPM}" == "true" ]]; then \
-        gosu ${AIRFLOW_USER} npm ci; \
+        npm ci; \
     fi
 
-COPY --chown=airflow:airflow airflow/www_rbac/ ${AIRFLOW_SOURCES}/airflow/www_rbac/
+COPY airflow/www_rbac/ ${AIRFLOW_SOURCES}/airflow/www_rbac/
 
 # Package NPM for production
 RUN \
     if [[ "${BUILD_NPM}" == "true" ]]; then \
-        gosu ${AIRFLOW_USER} npm run prod; \
+        npm run prod; \
     fi
 
 # Always apt-get update/upgrade here to get latest dependencies before
@@ -368,7 +367,7 @@ RUN apt-get update \
 
 # Cache for this line will be automatically invalidated if any
 # of airflow sources change
-COPY --chown=airflow:airflow . ${AIRFLOW_SOURCES}/
+COPY . ${AIRFLOW_SOURCES}/
 
 WORKDIR ${AIRFLOW_SOURCES}
 
@@ -383,15 +382,13 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 # Additional python deps to install
-ARG ADDITIONAL_PYTHON_DEPS=""
+ARG ADDITIONAL_PYTHON_DEPS="s3fs"
 
 RUN if [[ -n "${ADDITIONAL_PYTHON_DEPS}" ]]; then \
         pip install ${ADDITIONAL_PYTHON_DEPS}; \
     fi
 
-COPY --chown=airflow:airflow ./scripts/docker/entrypoint.sh /entrypoint.sh
-
-USER ${AIRFLOW_USER}
+COPY ./scripts/docker/entrypoint.sh /entrypoint.sh
 
 WORKDIR ${AIRFLOW_SOURCES}
 
